@@ -108,7 +108,8 @@
     }
 
     // Обновляем количество карт в колоде
-    gameState.remainingCards = 52 - gameState.players.length * 2
+    const activePlayers = gameState.players.filter(player => player.isActive)
+    gameState.remainingCards = 52 - activePlayers.length * 2
   }
 
   // Переключение активности игрока

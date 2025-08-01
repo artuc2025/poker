@@ -29,11 +29,15 @@
             :class="{ 'hand-item--winner': isWinner(playerHand.playerId) }"
           >
             <div class="hand-item__player">{{ playerHand.playerName }}</div>
-            <div class="hand-item__combination">{{ playerHand.hand.name }}</div>
+            <div class="hand-item__combination">
+              {{ playerHand.hand?.name || 'Неизвестно' }}
+            </div>
             <div class="hand-item__cards">
               <PokerCard
-                v-for="card in playerHand.hand.cards.slice(0, 5)"
-                :key="`${card.rank}-${card.suit}`"
+                v-for="card in (playerHand.hand?.cards || []).slice(0, 5)"
+                :key="
+                  card ? `${card.rank}-${card.suit}` : `null-${Math.random()}`
+                "
                 :card="card"
                 size="small"
               />
