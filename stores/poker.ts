@@ -5,6 +5,11 @@ import {
   getWinners,
   type PlayerHand,
 } from '../utils/pokerHands'
+import {
+  calculateQuickEquity,
+  calculateFullEquity,
+  type PlayerEquity,
+} from '../utils/equityCalculator'
 
 export interface Card {
   rank: string
@@ -29,6 +34,9 @@ export interface GameState {
   playerHands: PlayerHand[]
   winners: PlayerHand[]
   showResults: boolean
+  playerEquity: PlayerEquity[]
+  isCalculatingEquity: boolean
+  lastEquityCalculation: number
 }
 
 export const usePokerStore = defineStore('poker', () => {
@@ -48,6 +56,9 @@ export const usePokerStore = defineStore('poker', () => {
     playerHands: [],
     winners: [],
     showResults: false,
+    playerEquity: [],
+    isCalculatingEquity: false,
+    lastEquityCalculation: 0,
   })
 
   // Создание колоды
@@ -143,6 +154,8 @@ export const usePokerStore = defineStore('poker', () => {
           }
         }
         gameState.value.currentRound = 'Флоп'
+        // Обновляем equity после раздачи карт игрокам
+        await updateEquity()
         break
 
       case 'Флоп':
@@ -155,6 +168,8 @@ export const usePokerStore = defineStore('poker', () => {
           }
         }
         gameState.value.currentRound = 'Терн'
+        // Обновляем equity после флопа
+        await updateEquity()
         break
 
       case 'Терн':
@@ -163,6 +178,8 @@ export const usePokerStore = defineStore('poker', () => {
           gameState.value.communityCards[3] = gameState.value.deck.pop()!
           gameState.value.remainingCards--
           gameState.value.currentRound = 'Ривер'
+          // Обновляем equity после терна
+          await updateEquity()
         }
         break
 
@@ -172,6 +189,8 @@ export const usePokerStore = defineStore('poker', () => {
           gameState.value.communityCards[4] = gameState.value.deck.pop()!
           gameState.value.remainingCards--
           gameState.value.currentRound = 'Игра завершена'
+          // Обновляем equity после ривера
+          await updateEquity()
           // Определяем победителя после раздачи всех карт
           determineWinner()
         }
@@ -238,6 +257,77 @@ export const usePokerStore = defineStore('poker', () => {
     )
   })
 
+  // Расчет equity для игроков
+  const calculateEquity = async (useQuickCalculation: boolean = true) => {
+    if (gameState.value.isCalculatingEquity) return
+
+    const activePlayers = gameState.value.players.filter(
+      player => player.isActive
+    )
+    const hasPlayerCards = activePlayers.some(player =>
+      player.cards.some(card => card !== null)
+    )
+
+    if (!hasPlayerCards) {
+      gameState.value.playerEquity = []
+      return
+    }
+
+    gameState.value.isCalculatingEquity = true
+
+    try {
+      const equityResult = useQuickCalculation
+        ? calculateQuickEquity(activePlayers, gameState.value.communityCards)
+        : calculateFullEquity(activePlayers, gameState.value.communityCards)
+
+      gameState.value.playerEquity = equityResult.players
+      gameState.value.lastEquityCalculation = Date.now()
+    } catch {
+      gameState.value.playerEquity = []
+    } finally {
+      gameState.value.isCalculatingEquity = false
+    }
+  }
+
+  // Автоматический расчет equity при изменении карт
+  const updateEquity = async () => {
+    // Проверяем, прошло ли достаточно времени с последнего расчета
+    const timeSinceLastCalculation =
+      Date.now() - gameState.value.lastEquityCalculation
+    const minInterval = 1000 // Минимум 1 секунда между расчетами
+
+    if (timeSinceLastCalculation < minInterval) {
+      return
+    }
+
+    await calculateEquity(true) // Используем быстрый расчет для UI
+  }
+
+  // Получение equity для конкретного игрока
+  const getPlayerEquity = (playerId: number): PlayerEquity | undefined => {
+    return gameState.value.playerEquity.find(
+      equity => equity.playerId === playerId
+    )
+  }
+
+  // Проверка, нужно ли обновить equity
+  const shouldUpdateEquity = computed(() => {
+    const activePlayers = gameState.value.players.filter(
+      player => player.isActive
+    )
+    const hasPlayerCards = activePlayers.some(player =>
+      player.cards.some(card => card !== null)
+    )
+    const hasCommunityCards = gameState.value.communityCards.some(
+      card => card !== null
+    )
+
+    return (
+      hasPlayerCards &&
+      (hasCommunityCards || gameState.value.currentRound !== 'Префлоп')
+    )
+  })
+
   return {
     gameState,
     startNewGame,
@@ -247,5 +337,9 @@ export const usePokerStore = defineStore('poker', () => {
     activePlayers,
     visibleCommunityCards,
     canDetermineWinner,
+    calculateEquity,
+    updateEquity,
+    getPlayerEquity,
+    shouldUpdateEquity,
   }
 })

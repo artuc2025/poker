@@ -99,6 +99,9 @@
       </div>
     </div>
 
+    <!-- Live Equity Display -->
+    <EquityDisplay />
+
     <!-- Результаты игры -->
     <GameResults
       v-if="gameState.showResults"
@@ -125,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted } from 'vue'
+  import { onMounted, watch } from 'vue'
   import { usePokerStore } from '~/stores/poker'
   import type { PlayerHand } from '~/utils/pokerHands'
 
@@ -138,6 +141,8 @@
     startNewGame,
     dealCards,
     determineWinner,
+    updateEquity,
+    shouldUpdateEquity,
   } = pokerStore
 
   // Получаем состояние напрямую для реактивности
@@ -152,6 +157,21 @@
   const getPlayerHand = (playerId: number): PlayerHand | undefined => {
     return gameState.playerHands.find(hand => hand.playerId === playerId)
   }
+
+  // Автоматическое обновление equity при изменении карт
+  watch(
+    () => [
+      gameState.players.map(p => p.cards),
+      gameState.communityCards,
+      gameState.currentRound,
+    ],
+    async () => {
+      if (shouldUpdateEquity) {
+        await updateEquity()
+      }
+    },
+    { deep: true }
+  )
 
   // Инициализация при загрузке компонента
   onMounted(() => {
