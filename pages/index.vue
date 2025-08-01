@@ -102,6 +102,9 @@
     <!-- Live Equity Display -->
     <EquityDisplay />
 
+    <!-- Metrics Overview -->
+    <MetricsOverview />
+
     <!-- Результаты игры -->
     <GameResults
       v-if="gameState.showResults"
