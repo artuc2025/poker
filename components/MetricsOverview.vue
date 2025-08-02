@@ -264,7 +264,6 @@
 <script setup lang="ts">
   import { ref, computed, onMounted } from 'vue'
   import { usePokerStore } from '~/stores/poker'
-  import type { PlayerMetrics } from '~/stores/poker'
   import MetricsCharts from './MetricsCharts.vue'
 
   const pokerStore = usePokerStore()
@@ -275,28 +274,46 @@
     pokerStore
 
   // Вычисляемые свойства
-  const metrics = computed(() => getAllMetrics)
+  const metrics = computed(() => {
+    // Проверяем, является ли getAllMetrics функцией или объектом
+    if (typeof getAllMetrics === 'function') {
+      return getAllMetrics()
+    }
+    return getAllMetrics as any
+  })
+
   const activePlayers = computed(() =>
     gameState.players.filter(p => p.isActive)
   )
 
   // Сортированная частота комбинаций
   const sortedHandFrequency = computed(() => {
-    const frequency = metrics.value.hands.handFrequency
+    // Явно указываем типы для корректной типизации и сортировки
+    const frequency = metrics.value.hands.handFrequency as Record<
+      string,
+      number
+    >
     return Object.entries(frequency)
-      .sort(([, a], [, b]) => b - a)
-      .reduce(
-        (acc, [hand, count]) => {
-          acc[hand] = count
-          return acc
-        },
-        {} as Record<string, number>
-      )
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .reduce<Record<string, number>>((acc, [hand, count]) => {
+        acc[hand] = count as number
+        return acc
+      }, {})
   })
 
   // Максимальная частота для нормализации
+  // Приводим значения к number для корректной работы Math.max и устраняем ошибку типов
   const maxHandFrequency = computed(() => {
-    const frequencies = Object.values(metrics.value.hands.handFrequency)
+    // Явно указываем тип для frequency, чтобы избежать ошибок типов
+    const frequency = metrics.value.hands.handFrequency as Record<
+      string,
+      number | string | undefined
+    >
+    // Приводим значения к числу, фильтруем NaN
+    const frequencies = Object.values(frequency)
+      .map(v => Number(v))
+      .filter(v => !isNaN(v))
+    // Math.max корректно работает только с числами, если массив пустой — возвращаем 1
     return frequencies.length > 0 ? Math.max(...frequencies) : 1
   })
 
@@ -330,7 +347,9 @@
   }
 
   const getEquityTrend = (playerId: number) => {
-    return metrics.value.equity.currentTrends.find(t => t.playerId === playerId)
+    return metrics.value.equity.currentTrends.find(
+      (t: any) => t.playerId === playerId
+    )
   }
 
   const getTrendArrow = (
@@ -352,7 +371,10 @@
     const rounds = Object.entries(metrics.value.equity.averageEquityByRound)
     if (rounds.length === 0) return 'Нет данных'
 
-    const total = rounds.reduce((sum, [, equity]) => sum + equity, 0)
+    const total = rounds.reduce(
+      (sum, [, equity]) => sum + (equity as number),
+      0
+    )
     const average = total / rounds.length
     return formatPercentage(average)
   }

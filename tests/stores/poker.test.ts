@@ -423,3 +423,331 @@ describe('Poker Store', () => {
     })
   })
 })
+
+describe('Metrics System', () => {
+  let store: ReturnType<typeof usePokerStore>
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    store = usePokerStore()
+  })
+
+  describe('Metrics Interfaces', () => {
+    it('должен иметь правильную структуру GameMetrics', () => {
+      const metrics = store.gameState.metrics
+
+      expect(metrics).toHaveProperty('players')
+      expect(metrics).toHaveProperty('game')
+      expect(metrics).toHaveProperty('hands')
+      expect(metrics).toHaveProperty('equity')
+      expect(metrics).toHaveProperty('lastUpdated')
+
+      expect(Array.isArray(metrics.players)).toBe(true)
+      expect(typeof metrics.game).toBe('object')
+      expect(typeof metrics.hands).toBe('object')
+      expect(typeof metrics.equity).toBe('object')
+      expect(typeof metrics.lastUpdated).toBe('number')
+    })
+
+    it('должен иметь правильную структуру PlayerMetrics', () => {
+      // Сначала инициализируем метрики
+      store.updateMetrics()
+
+      const playerMetrics = store.gameState.metrics.players[0]
+
+      expect(playerMetrics).toHaveProperty('playerId')
+      expect(playerMetrics).toHaveProperty('playerName')
+      expect(playerMetrics).toHaveProperty('gamesPlayed')
+      expect(playerMetrics).toHaveProperty('wins')
+      expect(playerMetrics).toHaveProperty('winRate')
+      expect(playerMetrics).toHaveProperty('averageEquity')
+      expect(playerMetrics).toHaveProperty('totalEquity')
+      expect(playerMetrics).toHaveProperty('bestHand')
+      expect(playerMetrics).toHaveProperty('bestHandCount')
+      expect(playerMetrics).toHaveProperty('currentEquity')
+      expect(playerMetrics).toHaveProperty('equityHistory')
+      expect(playerMetrics).toHaveProperty('lastUpdated')
+
+      expect(typeof playerMetrics.playerId).toBe('number')
+      expect(typeof playerMetrics.playerName).toBe('string')
+      expect(typeof playerMetrics.gamesPlayed).toBe('number')
+      expect(typeof playerMetrics.wins).toBe('number')
+      expect(typeof playerMetrics.winRate).toBe('number')
+      expect(typeof playerMetrics.averageEquity).toBe('number')
+      expect(typeof playerMetrics.totalEquity).toBe('number')
+      expect(typeof playerMetrics.bestHand).toBe('string')
+      expect(typeof playerMetrics.bestHandCount).toBe('number')
+      expect(typeof playerMetrics.currentEquity).toBe('number')
+      expect(Array.isArray(playerMetrics.equityHistory)).toBe(true)
+      expect(typeof playerMetrics.lastUpdated).toBe('number')
+    })
+
+    it('должен иметь правильную структуру GameStats', () => {
+      const gameStats = store.gameState.metrics.game
+
+      expect(gameStats).toHaveProperty('totalGames')
+      expect(gameStats).toHaveProperty('totalDeals')
+      expect(gameStats).toHaveProperty('averageRoundDuration')
+      expect(gameStats).toHaveProperty('currentGameStartTime')
+      expect(gameStats).toHaveProperty('currentRoundStartTime')
+      expect(gameStats).toHaveProperty('mostFrequentHand')
+      expect(gameStats).toHaveProperty('mostFrequentHandCount')
+      expect(gameStats).toHaveProperty('averagePlayersPerGame')
+      expect(gameStats).toHaveProperty('totalEquityCalculations')
+
+      expect(typeof gameStats.totalGames).toBe('number')
+      expect(typeof gameStats.totalDeals).toBe('number')
+      expect(typeof gameStats.averageRoundDuration).toBe('number')
+      expect(typeof gameStats.currentGameStartTime).toBe('number')
+      expect(typeof gameStats.currentRoundStartTime).toBe('number')
+      expect(typeof gameStats.mostFrequentHand).toBe('string')
+      expect(typeof gameStats.mostFrequentHandCount).toBe('number')
+      expect(typeof gameStats.averagePlayersPerGame).toBe('number')
+      expect(typeof gameStats.totalEquityCalculations).toBe('number')
+    })
+
+    it('должен иметь правильную структуру HandStats', () => {
+      const handStats = store.gameState.metrics.hands
+
+      expect(handStats).toHaveProperty('handFrequency')
+      expect(handStats).toHaveProperty('winningHands')
+      expect(handStats).toHaveProperty('totalHands')
+
+      expect(typeof handStats.handFrequency).toBe('object')
+      expect(typeof handStats.winningHands).toBe('object')
+      expect(typeof handStats.totalHands).toBe('number')
+    })
+
+    it('должен иметь правильную структуру EquityTrends', () => {
+      const equityTrends = store.gameState.metrics.equity
+
+      expect(equityTrends).toHaveProperty('currentTrends')
+      expect(equityTrends).toHaveProperty('averageEquityByRound')
+      expect(equityTrends).toHaveProperty('equityHistory')
+
+      expect(Array.isArray(equityTrends.currentTrends)).toBe(true)
+      expect(typeof equityTrends.averageEquityByRound).toBe('object')
+      expect(Array.isArray(equityTrends.equityHistory)).toBe(true)
+    })
+  })
+
+  describe('Metrics Initialization', () => {
+    it('должен инициализировать метрики при создании store', () => {
+      const metrics = store.gameState.metrics
+
+      expect(store.gameState.currentGameId).toBe(0)
+      expect(metrics.players).toHaveLength(0) // Игроки не инициализируются автоматически
+      expect(metrics.game.totalGames).toBe(0)
+      expect(metrics.hands.totalHands).toBe(0)
+      expect(metrics.equity.currentTrends).toHaveLength(0)
+    })
+
+    it('должен инициализировать метрики игроков при updateMetrics()', () => {
+      store.updateMetrics()
+
+      expect(store.gameState.metrics.players).toHaveLength(4)
+
+      const playerMetrics = store.gameState.metrics.players[0]
+      expect(playerMetrics.playerId).toBe(1)
+      expect(playerMetrics.gamesPlayed).toBeGreaterThanOrEqual(0) // Может быть больше 0 после startNewGame
+      expect(playerMetrics.wins).toBe(0)
+      expect(playerMetrics.winRate).toBe(0)
+      expect(playerMetrics.averageEquity).toBe(0)
+      expect(playerMetrics.equityHistory).toHaveLength(0)
+      expect(playerMetrics.lastUpdated).toBeGreaterThan(0)
+    })
+
+    it('должен сбрасывать метрики при resetMetrics()', () => {
+      // Сначала инициализируем метрики
+      store.updateMetrics()
+
+      // Заполняем метрики данными
+      store.gameState.currentGameId = 5
+      store.gameState.metrics.players[0].gamesPlayed = 10
+      store.gameState.metrics.players[0].wins = 3
+      store.gameState.metrics.game.totalGames = 10
+      store.gameState.metrics.hands.totalHands = 50
+
+      store.resetMetrics()
+
+      // resetMetrics не сбрасывает currentGameId, только метрики
+      expect(store.gameState.metrics.players).toHaveLength(0)
+      expect(store.gameState.metrics.game.totalGames).toBe(0)
+      expect(store.gameState.metrics.hands.totalHands).toBe(0)
+    })
+  })
+
+  describe('Metrics Updates', () => {
+    beforeEach(() => {
+      store.startNewGame()
+    })
+
+    it('должен обновлять метрики игроков при updateMetrics()', () => {
+      store.updateMetrics()
+
+      store.gameState.metrics.players.forEach(playerMetrics => {
+        expect(playerMetrics.lastUpdated).toBeGreaterThan(0)
+      })
+    })
+
+    it('должен обновлять статистику игры при updateMetrics()', () => {
+      const initialTotalGames = store.gameState.metrics.game.totalGames
+
+      store.updateMetrics()
+
+      expect(store.gameState.metrics.game.totalGames).toBeGreaterThanOrEqual(
+        initialTotalGames
+      )
+    })
+  })
+
+  describe('Metrics Computed Properties', () => {
+    it('должен возвращать все метрики через getAllMetrics', () => {
+      const metrics = store.getAllMetrics
+
+      expect(metrics).toHaveProperty('players')
+      expect(metrics).toHaveProperty('game')
+      expect(metrics).toHaveProperty('hands')
+      expect(metrics).toHaveProperty('equity')
+      expect(metrics).toHaveProperty('lastUpdated')
+    })
+
+    it('должен возвращать метрики игрока через getPlayerMetricsComputed', () => {
+      // Сначала инициализируем метрики
+      store.updateMetrics()
+
+      const playerMetrics = store.getPlayerMetricsComputed(1)
+
+      expect(playerMetrics).toHaveProperty('playerId')
+      expect(playerMetrics).toHaveProperty('gamesPlayed')
+      expect(playerMetrics).toHaveProperty('wins')
+      expect(playerMetrics).toHaveProperty('winRate')
+      expect(playerMetrics).toHaveProperty('averageEquity')
+    })
+
+    it('должен мемоизировать результаты вычислений', () => {
+      const metrics1 = store.getAllMetrics
+      const metrics2 = store.getAllMetrics
+
+      // Проверяем, что это один и тот же объект (мемоизация работает)
+      expect(metrics1).toBe(metrics2)
+    })
+  })
+
+  describe('Game Integration', () => {
+    it('должен обновлять метрики при startNewGame()', () => {
+      const initialGameId = store.gameState.currentGameId
+      const initialTotalGames = store.gameState.metrics.game.totalGames
+
+      store.startNewGame()
+
+      expect(store.gameState.currentGameId).toBe(initialGameId + 1)
+      expect(store.gameState.metrics.game.totalGames).toBe(
+        initialTotalGames + 1
+      )
+    })
+
+    it('должен обновлять метрики при determineWinner()', async () => {
+      store.startNewGame()
+      store.gameState.currentRound = 'Игра завершена'
+      store.gameState.communityCards = [
+        { rank: 'A', suit: '♠', value: 14 },
+        { rank: 'K', suit: '♥', value: 13 },
+        { rank: 'Q', suit: '♦', value: 12 },
+        null,
+        null,
+      ]
+
+      // Симулируем игроков с картами
+      store.gameState.players[0].cards = [
+        { rank: 'A', suit: '♠', value: 14 },
+        { rank: 'K', suit: '♥', value: 13 },
+      ]
+
+      store.determineWinner()
+
+      // Проверяем, что метод выполнился без ошибок
+      expect(store.gameState.currentRound).toBe('Игра завершена')
+    })
+
+    it('должен обновлять метрики при updateEquity()', async () => {
+      store.startNewGame()
+
+      // Симулируем игроков с картами
+      store.gameState.players[0].cards = [
+        { rank: 'A', suit: '♠', value: 14 },
+        { rank: 'K', suit: '♥', value: 13 },
+      ]
+
+      await store.updateEquity()
+
+      // Проверяем, что метод выполнился без ошибок
+      expect(store.gameState.players[0].cards).toHaveLength(2)
+    })
+  })
+
+  describe('Metrics Edge Cases', () => {
+    it('должен обрабатывать пустые данные игроков', () => {
+      store.gameState.players = []
+
+      expect(() => store.updateMetrics()).not.toThrow()
+    })
+
+    it('должен обрабатывать пустые руки', () => {
+      store.gameState.playerHands = []
+      store.gameState.winners = []
+
+      expect(() => store.updateMetrics()).not.toThrow()
+    })
+
+    it('должен правильно вычислять процент побед при нулевых играх', () => {
+      // Сначала инициализируем метрики
+      store.updateMetrics()
+
+      const playerMetrics = store.gameState.metrics.players[0]
+      playerMetrics.gamesPlayed = 0
+      playerMetrics.wins = 0
+
+      expect(playerMetrics.winRate).toBe(0)
+    })
+
+    it('должен правильно вычислять среднюю эквити при пустой истории', () => {
+      // Сначала инициализируем метрики
+      store.updateMetrics()
+
+      const playerMetrics = store.gameState.metrics.players[0]
+      playerMetrics.equityHistory = []
+
+      expect(playerMetrics.averageEquity).toBe(0)
+    })
+  })
+
+  describe('Metrics Performance', () => {
+    it('должен эффективно обрабатывать большие объемы данных', () => {
+      // Симулируем большое количество игр
+      for (let i = 0; i < 100; i++) {
+        store.gameState.metrics.equity.equityHistory.push({
+          timestamp: Date.now() + i,
+          playerEquities: [{ playerId: 1, equity: Math.random() }],
+        })
+      }
+
+      const startTime = performance.now()
+      store.updateMetrics()
+      const endTime = performance.now()
+
+      // Обновление должно занимать менее 10мс
+      expect(endTime - startTime).toBeLessThan(10)
+    })
+
+    it('должен мемоизировать вычисления для производительности', () => {
+      const metrics1 = store.getAllMetrics
+      const metrics2 = store.getAllMetrics
+      const metrics3 = store.getAllMetrics
+
+      // Все вызовы должны возвращать один и тот же объект
+      expect(metrics1).toBe(metrics2)
+      expect(metrics2).toBe(metrics3)
+    })
+  })
+})

@@ -39,7 +39,6 @@
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
   import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
   import { usePokerStore } from '~/stores/poker'
@@ -321,8 +320,11 @@
     const averageEquityByRound = metrics.value.equity.averageEquityByRound
     if (Object.keys(averageEquityByRound).length === 0) return
 
+    // Явно типизируем значения averageEquityByRound, чтобы избежать ошибки unknown
     const labels = Object.keys(averageEquityByRound)
-    const data = Object.values(averageEquityByRound).map(equity => equity * 100)
+    const data = Object.values(averageEquityByRound).map(
+      equity => Number(equity) * 100
+    )
 
     if (roundsChart.value) {
       roundsChart.value.destroy()
